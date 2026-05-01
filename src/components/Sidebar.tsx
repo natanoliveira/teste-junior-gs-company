@@ -2,26 +2,36 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Contact } from '@/types';
+import { Contact, Tag } from '@/types';
 import { formatTime } from '@/utils/formatTime';
+import { getTagClass } from '@/utils/tagColors';
+import { TeamPanel } from './TeamPanel';
 
 interface SidebarProps {
   selectedContactId?: string;
   onSelectContact: (contact: Contact) => void;
 }
 
+const fetchContactsAndTags = async (): Promise<[Contact[], Tag[]]> => {
+  const [contacts, tags] = await Promise.all([
+    fetch('/api/contacts').then((res) => res.json()),
+    fetch('/api/tags').then((res) => res.json()),
+  ]);
+  return [contacts, tags];
+};
+
 export function Sidebar({ selectedContactId, onSelectContact }: SidebarProps) {
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [tagColorMap, setTagColorMap] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/contacts')
-      .then((res) => res.json())
-      .then((data: Contact[]) => {
-        setContacts(data);
-        setLoading(false);
-      });
+    fetchContactsAndTags().then(([contactsData, tagsData]) => {
+      setContacts(contactsData);
+      setTagColorMap(Object.fromEntries(tagsData.map((t) => [t.name, t.color])));
+      setLoading(false);
+    });
   }, []);
 
   const filtered = contacts.filter((c) =>
@@ -116,7 +126,7 @@ export function Sidebar({ selectedContactId, onSelectContact }: SidebarProps) {
                       {contact.tags.slice(0, 2).map((tag) => (
                         <span
                           key={tag}
-                          className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full"
+                          className={`text-xs px-1.5 py-0.5 rounded-full ${getTagClass(tag, tagColorMap)}`}
                         >
                           {tag}
                         </span>
@@ -129,6 +139,8 @@ export function Sidebar({ selectedContactId, onSelectContact }: SidebarProps) {
           </div>
         )}
       </div>
+
+      <TeamPanel />
 
       <div className="p-3 border-t border-gray-100 bg-gray-50 text-xs text-center text-gray-400">
         GS Company CRM v1.0

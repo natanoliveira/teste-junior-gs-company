@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { Contact, Message } from '@/types';
 import { MessageBubble } from './MessageBubble';
 import { TemplateSelector } from './TemplateSelector';
+import { NotesPanel } from './NotesPanel';
+import { QueueSelector } from './QueueSelector';
 import { Toast } from './Toast';
 
 // Aqui coloquei umas respostas automáticas para testes.
@@ -57,6 +59,11 @@ function getAutoReply(contactId: string): string {
   return replies[Math.floor(Math.random() * replies.length)];
 }
 
+const fetchMessages = async (contactId: string): Promise<Message[]> => {
+  const res = await fetch(`/api/messages?contactId=${contactId}`);
+  return res.json();
+};
+
 interface ChatWindowProps {
   contact: Contact | null;
 }
@@ -71,6 +78,7 @@ export function ChatWindow({ contact }: ChatWindowProps) {
   const [input, setInput] = useState('');
   const [isPending, startTransition] = useTransition();
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -78,8 +86,7 @@ export function ChatWindow({ contact }: ChatWindowProps) {
   useEffect(() => {
     if (!contact) return;
     startTransition(async () => {
-      const res = await fetch(`/api/messages?contactId=${contact.id}`);
-      const data: Message[] = await res.json();
+      const data = await fetchMessages(contact.id);
       setMessages(data);
     });
   }, [contact?.id]);
@@ -154,36 +161,50 @@ export function ChatWindow({ contact }: ChatWindowProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#efeae2] relative">
-      {toast && (
-        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
-      )}
+    <div className="flex-1 flex h-full overflow-hidden">
+      <div className="flex-1 flex flex-col bg-[#efeae2] relative">
+        {toast && (
+          <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+        )}
 
-      {/* Header */}
-      <header className="h-16 border-b border-gray-200 bg-white flex items-center px-6 shadow-sm z-10">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Image
-              src={contact.profilePicture}
-              alt={contact.name}
-              width={40}
-              height={40}
-              unoptimized
-              className="rounded-full object-cover"
-            />
-            <span
-              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white
-                ${contact.status === 'active' ? 'bg-green-400' : 'bg-gray-300'}`}
-            />
+        {/* Header */}
+        <header className="h-16 border-b border-gray-200 bg-white flex items-center px-6 shadow-sm z-10 justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Image
+                src={contact.profilePicture}
+                alt={contact.name}
+                width={40}
+                height={40}
+                unoptimized
+                className="rounded-full object-cover"
+              />
+              <span
+                className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white
+                  ${contact.status === 'active' ? 'bg-green-400' : 'bg-gray-300'}`}
+              />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-800">{contact.name}</h3>
+              <p className="text-xs text-gray-500">
+                {contact.status === 'active' ? 'Online' : 'Offline'} · {contact.phoneNumber}
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold text-gray-800">{contact.name}</h3>
-            <p className="text-xs text-gray-500">
-              {contact.status === 'active' ? 'Online' : 'Offline'} · {contact.phoneNumber}
-            </p>
+
+          <div className="flex items-center gap-2">
+            <QueueSelector />
+            <button
+              onClick={() => setShowNotes((prev) => !prev)}
+              title="Notas internas"
+              className={`p-2 rounded-lg transition-colors ${showNotes ? 'bg-yellow-100 text-yellow-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
           </div>
-        </div>
-      </header>
+        </header>
 
       {/* Mensagens */}
       <div className="flex-1 p-6 overflow-y-auto relative z-0">
@@ -259,6 +280,11 @@ export function ChatWindow({ contact }: ChatWindowProps) {
           </div>
         </div>
       </footer>
+      </div>
+
+      {showNotes && (
+        <NotesPanel contactId={contact.id} onClose={() => setShowNotes(false)} />
+      )}
     </div>
   );
 }
